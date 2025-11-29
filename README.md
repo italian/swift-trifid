@@ -52,8 +52,8 @@ python play_ai.py
 # Выбрать конкретную модель
 python play_ai.py --model model/model_20231128-133000.pth
 
-# Изменить скорость игры (меньше = быстрее)
-python play_ai.py --speed 10
+# Изменить скорость игры (больше = быстрее)
+python play_ai.py --speed 60
 
 # Сыграть 5 игр и показать статистику
 python play_ai.py --games 5
