@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+venv/
+.env
+model/*.pth
+audit_report.txt
+task.md
+walkthrough.md
+.mypy_cache/
+.vscode/
