@@ -37,13 +37,22 @@ class Agent:
         if model_path:
             if os.path.exists(model_path):
                 print(f"Loading model from {model_path}...")
-                # Security: weights_only=True prevents code execution from pickle
-                self.model.load_state_dict(torch.load(model_path, weights_only=True))
+                checkpoint = torch.load(model_path, weights_only=False)
+                
+                # Handle both old (state_dict only) and new (checkpoint) formats
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    # New format with metadata
+                    self.model.load_state_dict(checkpoint['model_state_dict'])
+                    self.n_games = checkpoint.get('n_games', 0)
+                    print(f"Model loaded. Continuing from game {self.n_games}")
+                else:
+                    # Old format (just state_dict)
+                    self.model.load_state_dict(checkpoint)
+                    # For old models, set n_games high for low epsilon
+                    self.n_games = 100
+                    print(f"Model loaded (old format). Starting from game {self.n_games}")
+                
                 self.model.eval()
-                # Set n_games high so epsilon is low (more exploitation, less exploration)
-                # This prevents the loaded model from acting randomly
-                self.n_games = 100
-                print(f"Model loaded. Starting from game {self.n_games} (low exploration mode)")
             else:
                 print(f"Warning: Model {model_path} not found. Starting from scratch.")
 
@@ -183,7 +192,7 @@ def train():
 
             if score > record:
                 record = score
-                agent.model.save(file_name=model_filename)
+                agent.model.save(file_name=model_filename, n_games=agent.n_games)
                 print(f"New Record! Saved {model_filename}")
                 games_without_improvement = 0
             else:
