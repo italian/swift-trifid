@@ -82,17 +82,6 @@ def play_ai():
     print(f"Max Score:     {max_score}")
     print("=" * 60)
 
-    # Save to leaderboard
-    from leaderboard import add_model_record
-    model_basename = os.path.basename(args.model)
-    add_model_record(
-        name=model_basename,
-        score=max_score,
-        features={"avg_score": f"{total_score / games_played if games_played > 0 else 0:.2f}", "games": games_played, "speed": args.speed}
-    )
-    print(f"\n✅ Record saved to leaderboard as '{model_basename}'")
-    print("Run 'python leaderboard.py' to view all records!")
-
 
 if __name__ == '__main__':
     play_ai()
