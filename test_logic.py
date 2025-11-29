@@ -25,6 +25,9 @@ class TestGameLogic(unittest.TestCase):
         """Game should start with score 0 and snake of length 3"""
         self.assertEqual(self.game.score, 0)
         self.assertEqual(len(self.game.snake), 3)
+        # Also verify initial direction and frame count
+        self.assertIsNotNone(self.game.direction)
+        self.assertEqual(self.game.frame_iteration, 0)
 
     def test_food_placement_not_on_snake(self):
         """Food should never appear inside the snake body"""
@@ -35,14 +38,34 @@ class TestGameLogic(unittest.TestCase):
 
     def test_collision_detection(self):
         """Collision detection should work correctly"""
-        # Test wall collision
-        self.game.head = Point(-1, 0)
-        self.assertTrue(self.game.is_collision(), "Should detect wall collision")
+        # Save original head position
+        original_head = self.game.head
+        
+        # Test wall collision - left wall
+        self.game.head = Point(-1, 100)
+        self.assertTrue(self.game.is_collision(), "Should detect left wall collision")
+        
+        # Test wall collision - right wall
+        self.game.head = Point(self.game.w, 100)
+        self.assertTrue(self.game.is_collision(), "Should detect right wall collision")
+        
+        # Test wall collision - top wall
+        self.game.head = Point(100, -1)
+        self.assertTrue(self.game.is_collision(), "Should detect top wall collision")
+        
+        # Test wall collision - bottom wall
+        self.game.head = Point(100, self.game.h)
+        self.assertTrue(self.game.is_collision(), "Should detect bottom wall collision")
 
         # Test self-collision
         self.game.head = Point(100, 100)
         self.game.snake = [Point(100, 100), Point(80, 100), Point(100, 100)]
         self.assertTrue(self.game.is_collision(), "Should detect self-collision")
+        
+        # Test no collision in valid position
+        self.game.head = Point(320, 240)  # Center of default 640x480 screen
+        self.game.snake = [Point(320, 240), Point(300, 240), Point(280, 240)]
+        self.assertFalse(self.game.is_collision(), "Should not detect collision in valid position")
 
     def test_speed_control(self):
         """Game should respect custom speed setting"""
@@ -50,6 +73,12 @@ class TestGameLogic(unittest.TestCase):
         game = SnakeGameAI(speed=custom_speed)
         self.assertEqual(game.speed, custom_speed,
                         "Game speed should match custom setting")
+        
+        # Test default speed
+        default_game = SnakeGameAI()
+        from game import DEFAULT_SPEED
+        self.assertEqual(default_game.speed, DEFAULT_SPEED,
+                        "Default speed should match DEFAULT_SPEED constant")
 
 
 class TestAgentLogic(unittest.TestCase):
@@ -60,7 +89,6 @@ class TestAgentLogic(unittest.TestCase):
 
     def test_epsilon_behavior_training(self):
         """Epsilon should decrease during training"""
-        initial_epsilon = self.agent.epsilon
         self.agent.n_games = 10
 
         # In training mode, epsilon should update
@@ -70,6 +98,12 @@ class TestAgentLogic(unittest.TestCase):
         expected_epsilon = 80 - 10  # 70
         self.assertEqual(self.agent.epsilon, expected_epsilon,
                         "Epsilon should update during training")
+        
+        # Test that epsilon goes negative for high n_games
+        self.agent.n_games = 100
+        self.agent.get_action(state, training=True)
+        self.assertEqual(self.agent.epsilon, -20,
+                        "Epsilon should be negative for high n_games")
 
     def test_epsilon_behavior_inference(self):
         """Epsilon should NOT change during inference"""
@@ -84,32 +118,71 @@ class TestAgentLogic(unittest.TestCase):
         self.assertEqual(self.agent.epsilon, 0,
                         "Epsilon should NOT change during inference!")
 
-    def test_loaded_model_epsilon(self):
-        """Loaded model should have low epsilon (high n_games)"""
+    def test_checkpoint_save_and_load(self):
+        """Model checkpoint should save and restore n_games correctly"""
+        import torch
+        
         # Create a temporary model file
         with tempfile.NamedTemporaryFile(suffix='.pth', delete=False) as f:
             temp_model_path = f.name
             
         try:
-            # Save a dummy model
+            # Create an agent and train it for some games
+            agent1 = Agent()
+            agent1.n_games = 350  # Simulate 350 games played
+            
+            # Save the model with checkpoint
+            agent1.model.save(file_name=os.path.basename(temp_model_path), n_games=agent1.n_games)
+            
+            # Move to temp location for loading
+            import shutil
+            saved_path = os.path.join('./model', os.path.basename(temp_model_path))
+            if os.path.exists(saved_path):
+                shutil.move(saved_path, temp_model_path)
+            
+            # Load it with a new Agent
+            agent2 = Agent(model_path=temp_model_path)
+            
+            # CRITICAL: n_games should be restored to 350, NOT reset to 0 or 100
+            self.assertEqual(agent2.n_games, 350,
+                           f"Loaded model should restore n_games=350, but got {agent2.n_games}")
+            
+            # Verify epsilon is low (exploitation mode)
+            state = np.array([0] * 11)
+            agent2.get_action(state, training=True)
+            expected_epsilon = 80 - 350  # Should be -270
+            self.assertEqual(agent2.epsilon, expected_epsilon,
+                           "Epsilon should be very negative for n_games=350")
+            
+        finally:
+            # Clean up
+            if os.path.exists(temp_model_path):
+                os.remove(temp_model_path)
+            # Clean up model folder
+            saved_path = os.path.join('./model', os.path.basename(temp_model_path))
+            if os.path.exists(saved_path):
+                os.remove(saved_path)
+
+    def test_old_model_format_compatibility(self):
+        """Old models (state_dict only) should still load with fallback n_games"""
+        import torch
+        
+        with tempfile.NamedTemporaryFile(suffix='.pth', delete=False) as f:
+            temp_model_path = f.name
+            
+        try:
+            # Save OLD format (just state_dict, no checkpoint)
             model = LinearQNet(11, 256, 3)
-            import torch
             torch.save(model.state_dict(), temp_model_path)
             
             # Load it with Agent
             agent = Agent(model_path=temp_model_path)
             
-            # n_games should be set high
-            self.assertGreaterEqual(agent.n_games, 80,
-                                  "Loaded model should have high n_games for low epsilon")
+            # Should fall back to n_games=100 for old models
+            self.assertEqual(agent.n_games, 100,
+                           "Old format models should default to n_games=100")
             
-            # Epsilon should be low or negative
-            state = np.array([0] * 11)
-            agent.get_action(state, training=True)
-            self.assertLessEqual(agent.epsilon, 0,
-                               "Loaded model should have low/negative epsilon")
         finally:
-            # Clean up
             if os.path.exists(temp_model_path):
                 os.remove(temp_model_path)
 
@@ -122,6 +195,11 @@ class TestAgentLogic(unittest.TestCase):
                         "State vector must have exactly 11 elements")
         self.assertTrue(np.issubdtype(state.dtype, np.integer),
                        "State elements should be integers (0 or 1)")
+        
+        # Verify all elements are 0 or 1
+        for element in state:
+            self.assertIn(element, [0, 1],
+                        f"State element {element} should be 0 or 1")
 
 
 class TestModelArchitecture(unittest.TestCase):
@@ -137,6 +215,23 @@ class TestModelArchitecture(unittest.TestCase):
 
         self.assertEqual(output.shape[0], 3,
                         "Model should output 3 Q-values (straight, right, left)")
+        
+        # Verify output is a tensor
+        self.assertIsInstance(output, torch.Tensor,
+                            "Model output should be a torch Tensor")
+
+    def test_model_forward_pass(self):
+        """Model forward pass should not crash and produce reasonable values"""
+        import torch
+        model = LinearQNet(11, 256, 3)
+        
+        # Test with random input
+        random_input = torch.randn(11)
+        output = model(random_input)
+        
+        # Output should be finite
+        self.assertTrue(torch.isfinite(output).all(),
+                       "Model output should be finite (no NaN or Inf)")
 
 
 class TestLeaderboard(unittest.TestCase):
@@ -172,6 +267,9 @@ class TestLeaderboard(unittest.TestCase):
         self.assertEqual(self.lb.data["models"][0]["score"], 50)
         self.assertEqual(self.lb.data["models"][0]["features"]["architecture"], 
                         "Linear Q-Network")
+        
+        # Verify date was added
+        self.assertIn("date", self.lb.data["models"][0])
 
     def test_add_human_record(self):
         """Should add human record"""
@@ -180,6 +278,7 @@ class TestLeaderboard(unittest.TestCase):
         self.assertEqual(len(self.lb.data["humans"]), 1)
         self.assertEqual(self.lb.data["humans"][0]["score"], 25)
         self.assertEqual(self.lb.data["humans"][0]["speed"], 40)
+        self.assertEqual(self.lb.data["humans"][0]["name"], "Player1")
 
     def test_leaderboard_sorting(self):
         """Records should be sorted by score descending"""
@@ -189,19 +288,45 @@ class TestLeaderboard(unittest.TestCase):
         
         scores = [r["score"] for r in self.lb.data["models"]]
         self.assertEqual(scores, [50, 30, 10], "Should be sorted descending")
+    
+    def test_leaderboard_limit(self):
+        """Should keep only top 20 records"""
+        # Add 25 model records
+        for i in range(25):
+            self.lb.add_model_record(f"model_{i}", i)
+        
+        # Should keep only top 20
+        self.assertEqual(len(self.lb.data["models"]), 20,
+                        "Should keep only top 20 records")
+        
+        # Verify it kept the highest scores (24 down to 5)
+        scores = [r["score"] for r in self.lb.data["models"]]
+        self.assertEqual(scores[0], 24, "Top score should be 24")
+        self.assertEqual(scores[-1], 5, "Lowest score should be 5")
 
 
 class TestHumanGame(unittest.TestCase):
     """Test human game mode"""
 
-    def test_game_over_flag(self):
-        """Game over flag should control message repetition"""
+    def test_game_over_flag_initial(self):
+        """Game should start with game_over=False"""
         game = HumanGame()
         self.assertFalse(game.game_over, "Should start with game_over=False")
-        
+
+    def test_game_over_flag_setter(self):
+        """Game over flag should be settable"""
+        game = HumanGame()
         game.game_over = True
-        # Simulate that game is over - further play_step should not execute
-        # (tested manually as it requires pygame event loop)
+        self.assertTrue(game.game_over, "game_over should be True after setting")
+        
+        # Reset
+        game.game_over = False
+        self.assertFalse(game.game_over, "game_over should be False after reset")
+    
+    def test_human_game_has_session_best(self):
+        """Human game should track session_best"""
+        game = HumanGame()
+        self.assertEqual(game.session_best, 0, "session_best should start at 0")
 
 
 if __name__ == '__main__':
