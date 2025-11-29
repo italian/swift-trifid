@@ -175,11 +175,6 @@ def train():
                 record = score
                 agent.model.save(file_name=model_filename)
                 print(f"New Record! Saved {model_filename}")
-                
-                # Save to leaderboard
-                from leaderboard import add_model_record
-                add_model_record(model_filename, record, features={"games": agent.n_games})
-                
                 games_without_improvement = 0
             else:
                 games_without_improvement += 1
@@ -196,6 +191,24 @@ def train():
             if games_without_improvement >= patience:
                 print(f"\nEarly Stopping triggered! No improvement for {patience} games.")
                 print(f"Best Record: {record}")
+                
+                # Save final model to leaderboard
+                from leaderboard import add_model_record
+                model_info = {
+                    "architecture": "Linear Q-Network",
+                    "hidden_size": 256,
+                    "input_size": 11,
+                    "output_size": 3,
+                    "total_games": agent.n_games,
+                    "final_record": record,
+                    "mean_score": round(mean_score, 2),
+                    "learning_rate": LR,
+                    "gamma": agent.gamma,
+                    "speed": game.speed
+                }
+                add_model_record(model_filename, record, features=model_info)
+                print(f"Model saved to leaderboard!")
+                
                 print(f"Model saved as: {model_filename}")
                 break
 

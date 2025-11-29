@@ -48,27 +48,46 @@ class Leaderboard:
         self._save()
 
     def display(self):
-        print("\n🏆 LEADERBOARD 🏆")
+        print("\n" + "=" * 100)
+        print("🏆 LEADERBOARD - SNAKE AI 🏆".center(100))
+        print("=" * 100)
         
-        print("\n🤖 TOP AI MODELS")
+        print("\n🤖 TOP AI MODELS\n")
         if not self.data["models"]:
-            print("No records yet.")
+            print("   No trained models yet.")
         else:
-            print(f"{'Score':<10} | {'Model Name':<30} | {'Date':<20} | {'Features'}")
-            print("-" * 80)
-            for r in self.data["models"]:
-                features = str(r.get("features", ""))
-                print(f"{r['score']:<10} | {r['name']:<30} | {r['date']:<20} | {features}")
+            for idx, r in enumerate(self.data["models"], 1):
+                print(f"#{idx}. Score: {r['score']:>3} | Model: {r['name']}")
+                print(f"    📅 Trained: {r['date']}")
+                features = r.get("features", {})
+                if isinstance(features, dict):
+                    if "architecture" in features:
+                        print(f"    🧠 Architecture: {features.get('architecture', 'N/A')}")
+                    if "hidden_size" in features:
+                        print(f"    🔢 Hidden Size: {features.get('hidden_size', 'N/A')}")
+                    if "total_games" in features:
+                        print(f"    🎮 Total Games Trained: {features.get('total_games', 'N/A')}")
+                    if "mean_score" in features:
+                        print(f"    📊 Mean Score: {features.get('mean_score', 'N/A')}")
+                    if "learning_rate" in features:
+                        print(f"    📈 Learning Rate: {features.get('learning_rate', 'N/A')}")
+                    if "gamma" in features:
+                        print(f"    🎯 Gamma: {features.get('gamma', 'N/A')}")
+                print()
 
-        print("\n👤 TOP HUMANS")
+        print("-" * 100)
+        print("\n👤 TOP HUMAN PLAYERS\n")
         if not self.data["humans"]:
-            print("No records yet.")
+            print("   No human records yet.")
         else:
-            print(f"{'Score':<10} | {'Player Name':<20} | {'Date':<20} | {'Speed'}")
-            print("-" * 70)
-            for r in self.data["humans"]:
-                speed = str(r.get("speed", "N/A"))
-                print(f"{r['score']:<10} | {r['name']:<20} | {r['date']:<20} | {speed}")
+            for idx, r in enumerate(self.data["humans"], 1):
+                print(f"#{idx}. Score: {r['score']:>3} | Player: {r['name']}")
+                print(f"    📅 Date: {r['date']}")
+                if r.get("speed"):
+                    print(f"    ⚡ Game Speed: {r.get('speed', 'N/A')} FPS")
+                print()
+        
+        print("=" * 100)
 
 def add_model_record(name, score, features=None):
     lb = Leaderboard()
