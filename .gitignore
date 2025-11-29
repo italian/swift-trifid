@@ -9,3 +9,4 @@ walkthrough.md
 .mypy_cache/
 .vscode/
 leaderboard.json
+.agent/workflows/code-changes.md
