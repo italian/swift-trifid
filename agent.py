@@ -40,6 +40,10 @@ class Agent:
                 # Security: weights_only=True prevents code execution from pickle
                 self.model.load_state_dict(torch.load(model_path, weights_only=True))
                 self.model.eval()
+                # Set n_games high so epsilon is low (more exploitation, less exploration)
+                # This prevents the loaded model from acting randomly
+                self.n_games = 100
+                print(f"Model loaded. Starting from game {self.n_games} (low exploration mode)")
             else:
                 print(f"Warning: Model {model_path} not found. Starting from scratch.")
 
@@ -144,9 +148,14 @@ def train():
     # Early stopping variables
     games_without_improvement = 0
     patience = args.patience
+    
+    # Track games in this session (not total n_games which may start high for loaded models)
+    session_games = 0
 
     print(f"Starting training. Saving best models to {model_filename}")
     print(f"Early stopping patience: {patience} games")
+    if args.load:
+        print(f"Continuing training from game {agent.n_games}")
 
     while True:
         # get old state
@@ -169,6 +178,7 @@ def train():
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
+            session_games += 1
             agent.train_long_memory()
 
             if score > record:
@@ -179,12 +189,12 @@ def train():
             else:
                 games_without_improvement += 1
 
-            print(f'Game {agent.n_games} Score {score} '
+            print(f'Game {agent.n_games} (Session: {session_games}) Score {score} '
                   f'Record {record} No Improv {games_without_improvement}')
 
             plot_scores.append(score)
             total_score += score
-            mean_score = total_score / agent.n_games
+            mean_score = total_score / session_games  # Use session_games, not agent.n_games!
             plot_mean_scores.append(mean_score)
             plot(plot_scores, plot_mean_scores)
 
@@ -200,6 +210,7 @@ def train():
                     "input_size": 11,
                     "output_size": 3,
                     "total_games": agent.n_games,
+                    "session_games": session_games,
                     "final_record": record,
                     "mean_score": round(mean_score, 2),
                     "learning_rate": LR,

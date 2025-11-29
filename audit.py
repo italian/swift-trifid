@@ -18,7 +18,7 @@ def main():
     with open("audit_report.txt", "w", encoding="utf-8") as f:
         f.write("=== STARTING AUTOMATED AUDIT ===\n\n")
 
-        files_to_check = "agent.py game.py model.py helper.py"
+        files_to_check = "agent.py game.py model.py helper.py leaderboard.py play_human.py play_ai.py"
 
         # 1. Security Check (Bandit)
         f.write("[1/4] Security Audit (Bandit)\n")

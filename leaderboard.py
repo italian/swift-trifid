@@ -65,10 +65,22 @@ class Leaderboard:
                         print(f"    🧠 Architecture: {features.get('architecture', 'N/A')}")
                     if "hidden_size" in features:
                         print(f"    🔢 Hidden Size: {features.get('hidden_size', 'N/A')}")
-                    if "total_games" in features:
-                        print(f"    🎮 Total Games Trained: {features.get('total_games', 'N/A')}")
+                    
+                    # Show training info with indication of continued training
+                    total_games = features.get('total_games')
+                    session_games = features.get('session_games')
+                    if total_games and session_games:
+                        if total_games > session_games:
+                            # Continued training
+                            print(f"    🎮 Total Games: {total_games} (🔄 Continued training: +{session_games} games)")
+                        else:
+                            # Fresh training
+                            print(f"    🎮 Total Games Trained: {total_games}")
+                    elif total_games:
+                        print(f"    🎮 Total Games Trained: {total_games}")
+                    
                     if "mean_score" in features:
-                        print(f"    📊 Mean Score: {features.get('mean_score', 'N/A')}")
+                        print(f"    📊 Mean Score (this session): {features.get('mean_score', 'N/A')}")
                     if "learning_rate" in features:
                         print(f"    📈 Learning Rate: {features.get('learning_rate', 'N/A')}")
                     if "gamma" in features:
