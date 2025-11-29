@@ -23,7 +23,7 @@ def main():
         # 1. Security Check (Bandit)
         f.write("[1/4] Security Audit (Bandit)\n")
         print("Running Bandit...")
-        result = subprocess.run(f"bandit -r {files_to_check}", capture_output=True, text=True, shell=True)
+        result = subprocess.run(f"{sys.executable} -m bandit -r {files_to_check}", capture_output=True, text=True, shell=True)
         f.write(result.stdout)
         if result.stderr:
             f.write("Errors/Warnings:\n")
@@ -34,7 +34,7 @@ def main():
         f.write("\n[2/4] Code Quality Audit (Pylint)\n")
         print("Running Pylint...")
         disabled_checks = "C0114,C0115,C0116,E1101,R0913,R0917,R0902,R0903,R0914"
-        result = subprocess.run(f"pylint {files_to_check} --disable={disabled_checks}",
+        result = subprocess.run(f"{sys.executable} -m pylint {files_to_check} --disable={disabled_checks}",
                               capture_output=True, text=True, shell=True)
         f.write(result.stdout)
         quality_score = result.returncode
@@ -42,7 +42,7 @@ def main():
         # 3. Type Safety (Mypy)
         f.write("\n[3/4] Type Safety Audit (Mypy)\n")
         print("Running Mypy...")
-        result = subprocess.run(f"mypy {files_to_check}", capture_output=True, text=True, shell=True)
+        result = subprocess.run(f"{sys.executable} -m mypy {files_to_check}", capture_output=True, text=True, shell=True)
         f.write(result.stdout)
         type_score = result.returncode
 
