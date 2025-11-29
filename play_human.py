@@ -1,6 +1,13 @@
 import sys
+import argparse
 import pygame
 from game import SnakeGameAI, Direction, DEFAULT_SPEED
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Play Snake as a human')
+    parser.add_argument('--speed', type=int, default=DEFAULT_SPEED,
+                        help=f'Game speed in FPS (default: {DEFAULT_SPEED})')
+    return parser.parse_args()
 
 # Человеческий режим игры
 class HumanGame(SnakeGameAI):
@@ -8,6 +15,7 @@ class HumanGame(SnakeGameAI):
         super().__init__(w, h, speed)
         self.paused = False
         self.session_best = 0
+        self.game_over = False
 
     def play_human(self):
         """Основной игровой цикл для человека"""
@@ -24,9 +32,10 @@ class HumanGame(SnakeGameAI):
                         self.paused = not self.paused
                     elif event.key == pygame.K_r:
                         self.reset()
+                        self.game_over = False
 
-                    # Управление (только если не на паузе)
-                    if not self.paused:
+                    # Управление (только если не на паузе и не game over)
+                    if not self.paused and not self.game_over:
                         if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                             if self.direction != Direction.RIGHT:
                                 self.direction = Direction.LEFT
@@ -40,7 +49,7 @@ class HumanGame(SnakeGameAI):
                             if self.direction != Direction.UP:
                                 self.direction = Direction.DOWN
 
-            if not self.paused:
+            if not self.paused and not self.game_over:
                 # Конвертируем направление в действие для play_step
                 action = self._direction_to_action()
                 reward, game_over, score = self.play_step(action)
@@ -50,6 +59,7 @@ class HumanGame(SnakeGameAI):
                     self.session_best = score
 
                 if game_over:
+                    self.game_over = True
                     print(f'\n🎮 Game Over! Your Score: {score}')
                     print(f'Session Best: {self.session_best}')
                     print('Press R to restart or close window to exit')
@@ -73,6 +83,8 @@ class HumanGame(SnakeGameAI):
 
 
 if __name__ == '__main__':
+    args = get_args()
+    
     print("=" * 60)
     print("🐍 SNAKE GAME - HUMAN MODE 🐍")
     print("=" * 60)
@@ -83,8 +95,9 @@ if __name__ == '__main__':
     print("  → / D     - Move Right")
     print("  SPACE     - Pause/Resume")
     print("  R         - Restart")
+    print(f"\nGame Speed: {args.speed} FPS")
     print("\nGood luck! 🍎")
     print("=" * 60)
 
-    game = HumanGame()
+    game = HumanGame(speed=args.speed)
     game.play_human()
